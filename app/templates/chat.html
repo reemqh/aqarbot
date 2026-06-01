@@ -1,0 +1,231 @@
+{% extends "base.html" %}
+
+{% set lang = request.cookies.get('lang', 'ar') %}
+
+{% block title %}
+{{ 'AqarBot - Chat' if lang == 'en' else 'AqarBot - الدردشة' }}
+{% endblock %}
+
+{% block head_extra %}
+<style>
+  /* Only the scrollbar fix — nothing else changed */
+  #chatMessages {
+    overflow-y: auto;
+    /* Enables scrollbar when content overflows */
+    scrollbar-width: thin;
+    /* Firefox: thin scrollbar */
+    scrollbar-color: #a0aec0 #f7fafc;
+    /* Firefox colors */
+  }
+
+  #chatMessages::-webkit-scrollbar {
+    width: 8px;
+    /* Chrome/Safari: thin scrollbar */
+  }
+
+  #chatMessages::-webkit-scrollbar-track {
+    background: #f7fafc;
+    /* light track */
+    border-radius: 10px;
+  }
+
+  #chatMessages::-webkit-scrollbar-thumb {
+    background: #a0aec0;
+    /* thumb color */
+    border-radius: 10px;
+  }
+
+  #chatMessages::-webkit-scrollbar-thumb:hover {
+    background: #718096;
+  }
+
+  /* Sidebar */
+  .sidebar {
+    width: 280px;
+    background: white;
+    border-right: 1px solid #e5e5e5;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+  }
+
+  .accordion-header {
+    cursor: pointer;
+    padding: 0.75rem 1rem;
+    background: #f8f9fa;
+    border-bottom: 1px solid #e5e5e5;
+    font-weight: 500;
+    transition: all 0.2s;
+  }
+
+  .accordion-header:hover {
+    background: #f0f0f0;
+  }
+
+  .accordion-content {
+    padding: 0.75rem 1rem;
+    display: none;
+  }
+
+  .accordion-content.open {
+    display: block;
+  }
+
+  .sidebar>div:last-child {
+    margin-top: auto;
+    /* Push profile section to bottom */
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="flex h-screen bg-aqar-bg overflow-hidden">
+  <!-- Sidebar (collapsible options guide) -->
+  <div class="sidebar flex-shrink-0 flex flex-col h-screen">
+
+    <!-- Budget -->
+    <div class="accordion-header" onclick="this.nextElementSibling.classList.toggle('open')">
+      {{ 'الميزانية' if lang == 'ar' else 'Budget' }}
+    </div>
+    <div class="accordion-content">
+      <ul class="text-sm text-gray-700 space-y-1">
+        <li>{{ 'أقل من 300,000' if lang == 'ar' else 'Under 300,000' }}</li>
+        <li>{{ '300,000 - 500,000' if lang == 'ar' else '300,000 - 500,000' }}</li>
+        <li>{{ '500,000 - 800,000' if lang == 'ar' else '500,000 - 800,000' }}</li>
+        <li>{{ '800,000 - 1,200,000' if lang == 'ar' else '800,000 - 1,200,000' }}</li>
+        <li>{{ '1,200,000 - 2,000,000' if lang == 'ar' else '1,200,000 - 2,000,000' }}</li>
+        <li>{{ 'أكثر من 2,000,000' if lang == 'ar' else 'Above 2,000,000' }}</li>
+      </ul>
+    </div>
+
+    <!-- Location -->
+    <div class="accordion-header" onclick="this.nextElementSibling.classList.toggle('open')">
+      {{ 'الموقع' if lang == 'ar' else 'Location' }}
+    </div>
+    <div class="accordion-content">
+      <ul class="text-sm text-gray-700 space-y-1">
+        <li>{{ 'طريق الملك فهد' if lang == 'ar' else 'King Fahd Road' }}</li>
+        <li>{{ 'العليا' if lang == 'ar' else 'Al-Olaya' }}</li>
+        <li>{{ 'وسط الرياض' if lang == 'ar' else 'Downtown Riyadh' }}</li>
+        <li>{{ 'النخيل' if lang == 'ar' else 'Al-Nakheel' }}</li>
+        <li>{{ 'شمال الرياض' if lang == 'ar' else 'North Riyadh' }}</li>
+        <li>{{ 'القادسية' if lang == 'ar' else 'Al-Qadsiyah' }}</li>
+      </ul>
+    </div>
+
+    <!-- Property Type -->
+    <div class="accordion-header" onclick="this.nextElementSibling.classList.toggle('open')">
+      {{ 'نوع العقار' if lang == 'ar' else 'Property Type' }}
+    </div>
+    <div class="accordion-content">
+      <ul class="text-sm text-gray-700 space-y-1">
+        <li>{{ 'شقة' if lang == 'ar' else 'Apartment' }}</li>
+        <li>{{ 'فيلا' if lang == 'ar' else 'Villa' }}</li>
+        <li>{{ 'تاون هاوس' if lang == 'ar' else 'Townhouse' }}</li>
+      </ul>
+    </div>
+
+    <!-- Bedrooms -->
+    <div class="accordion-header" onclick="this.nextElementSibling.classList.toggle('open')">
+      {{ 'عدد الغرف' if lang == 'ar' else 'Bedrooms' }}
+    </div>
+    <div class="accordion-content">
+      <ul class="text-sm text-gray-700 space-y-1">
+        <li>{{ '2 غرف' if lang == 'ar' else '2' }}</li>
+        <li>{{ '3 غرف' if lang == 'ar' else '3' }}</li>
+        <li>{{ '4 غرف' if lang == 'ar' else '4' }}</li>
+        <li>{{ '5 غرف أو أكثر' if lang == 'ar' else '5+' }}</li>
+      </ul>
+    </div>
+
+    <!-- Amenities -->
+    <div class="accordion-header" onclick="this.nextElementSibling.classList.toggle('open')">
+      {{ 'المرافق' if lang == 'ar' else 'Amenities' }}
+    </div>
+    <div class="accordion-content">
+      <ul class="text-sm text-gray-700 space-y-1 columns-2">
+        <li>{{ 'صالة رياضية' if lang == 'ar' else 'Gym' }}</li>
+        <li>{{ 'مسبح' if lang == 'ar' else 'Pool' }}</li>
+        <li>{{ 'موقف سيارات' if lang == 'ar' else 'Parking' }}</li>
+        <li>{{ 'حديقة' if lang == 'ar' else 'Garden' }}</li>
+        <li>{{ 'أمن' if lang == 'ar' else 'Security' }}</li>
+        <li>{{ 'غرفة خادمة' if lang == 'ar' else 'Maid Room' }}</li>
+        <li>{{ 'جراج' if lang == 'ar' else 'Garage' }}</li>
+        <li>{{ 'سينما منزلية' if lang == 'ar' else 'Home Cinema' }}</li>
+        <li>{{ 'ملعب' if lang == 'ar' else 'Playground' }}</li>
+        <li>{{ 'كونسيرج' if lang == 'ar' else 'Concierge' }}</li>
+      </ul>
+    </div>
+
+    <!-- Profile Link (at bottom) -->
+    <div class="border-t mt-auto pt-4 pb-4">
+      <a href="/history"
+        class="flex items-center gap-2 px-4 py-3 mb-2 rounded-lg bg-white border border-aqar-green text-aqar-dark hover:bg-aqar-bg transition font-semibold">
+        <i class="fas fa-history"></i>
+        {{ 'سجل المحادثات' if lang == 'ar' else 'Chat History' }}
+      </a>
+      <a href="/profile"
+        class="flex items-center gap-2 px-4 py-3 rounded-lg bg-aqar-green text-white hover:bg-aqar-dark transition font-semibold">
+        <i class="fas fa-user-circle"></i>
+        {{ 'ملفي الشخصي' if lang == 'ar' else 'My Profile' }}
+      </a>
+      <a href="/appointments"
+        class="flex items-center gap-2 px-4 py-3 mt-2 rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition font-semibold">
+        <i class="fas fa-calendar-check"></i>
+        {{ 'مواعيدي' if lang == 'ar' else 'My Appointments' }}
+      </a>
+      <button id="newChatBtn"
+        class="flex items-center gap-2 px-4 py-3 mt-2 rounded-lg bg-aqar-mint text-aqar-dark hover:bg-aqar-dark hover:text-white transition font-semibold w-full">
+        <i class="fas fa-plus-circle"></i>
+        {{ 'محادثة جديدة' if lang == 'ar' else 'New Chat' }}
+      </button>
+    </div>
+  </div>
+
+  <!-- Chat Area -->
+  <div class="flex-1 flex flex-col">
+    <!-- Start screen -->
+    <div id="startScreen"
+      class="flex-1 flex flex-col items-center justify-center bg-gradient-to-b from-aqar-bg to-white">
+      <h1 class="text-6xl md:text-8xl font-extrabold text-aqar-dark tracking-tighter mb-6">
+        Aqar<span class="text-aqar-mint">Bot</span>
+      </h1>
+      <p class="text-lg md:text-xl text-gray-600 mb-12 text-center max-w-2xl px-6">
+        {{ 'ابحث عن عقارك المثالي من خلال محادثة بسيطة' if lang == 'ar' else 'Find your perfect property through a
+        simple conversation' }}
+      </p>
+      <button id="startChatBtn"
+        class="bg-aqar-green text-white text-xl font-semibold px-12 py-5 rounded-full shadow-lg hover:bg-aqar-dark transition transform hover:scale-105">
+        {{ 'ابدأ الدردشة' if lang == 'ar' else 'Start Chat' }}
+      </button>
+    </div>
+
+    <!-- Chat interface -->
+    <div id="chatInterface" class="hidden flex flex-col flex-1 overflow-hidden">
+      <!-- Messages with its own scrollbar -->
+      <div id="chatMessages" class="flex-1 overflow-y-auto px-4 py-6 space-y-4 bg-aqar-bg">
+        <!-- Messages here -->
+      </div>
+
+      <div class="border-t border-gray-200 bg-white p-4">
+        <div class="input-group flex items-center gap-3 max-w-4xl mx-auto">
+          <input type="text" id="messageInput"
+            class="flex-1 border border-gray-300 rounded-full px-5 py-3 text-base focus:outline-none focus:border-aqar-green focus:ring-1 focus:ring-aqar-green placeholder-gray-500"
+            placeholder="{{ 'اكتب إجابتك هنا...' if lang == 'ar' else 'Type your answer here...' }}" autocomplete="off">
+          <button id="sendBtn"
+            class="bg-aqar-green text-white w-12 h-12 rounded-full hover:bg-aqar-dark transition flex items-center justify-center flex-shrink-0">
+            <i class="fas fa-paper-plane"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/chat.js') }}"></script>
+{% endblock %}

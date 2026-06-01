@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+
+{% set lang = request.cookies.get('lang', 'ar') %}
+
+{% block title %}
+{{ 'AqarBot - History' if lang == 'en' else 'AqarBot - السجل' }}
+{% endblock %}
+
+{% block head_extra %}
+<style>
+  #historyMessages {
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: #a0aec0 #f7fafc;
+  }
+
+  #historyMessages::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  #historyMessages::-webkit-scrollbar-track {
+    background: #f7fafc;
+    border-radius: 10px;
+  }
+
+  #historyMessages::-webkit-scrollbar-thumb {
+    background: #a0aec0;
+    border-radius: 10px;
+  }
+
+  /* Sidebar */
+  .sidebar {
+    width: 320px;
+    background: white;
+    border-right: 1px solid #e5e5e5;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+  }
+
+  .session-item {
+    cursor: pointer;
+    padding: 1rem;
+    border-bottom: 1px solid #f0f0f0;
+    transition: all 0.2s;
+  }
+
+  .session-item:hover {
+    background: #f8fafc;
+  }
+
+  .session-item.active {
+    background: #f0fdf4;
+    border-right: 4px solid #10b981;
+  }
+
+  .message-bubble {
+    max-width: 80%;
+    margin-bottom: 1rem;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="flex h-screen bg-aqar-bg overflow-hidden">
+  <!-- Sidebar: List of Completed Chats -->
+  <div class="sidebar flex-shrink-0 flex flex-col h-screen">
+    <div class="p-4 border-b bg-white sticky top-0 z-10">
+      <h2 class="text-xl font-bold text-aqar-dark">
+        {{ 'سجل المحادثات' if lang == 'ar' else 'Chat History' }}
+      </h2>
+      <p class="text-sm text-gray-500">
+        {{ 'المحادثات المكتملة فقط' if lang == 'ar' else 'Completed chats only' }}
+      </p>
+    </div>
+
+    <div id="sessionList" class="flex-1 overflow-y-auto">
+      <!-- Session items will be injected here -->
+      <div id="listLoader" class="flex items-center justify-center py-12">
+        <i class="fas fa-spinner fa-spin text-2xl text-aqar-green"></i>
+      </div>
+      <div id="noSessions" class="hidden p-8 text-center text-gray-500">
+        <i class="fas fa-history text-4xl mb-4 opacity-20"></i>
+        <p>{{ 'لا توجد محادثات مكتملة بعد' if lang == 'ar' else 'No completed chats yet' }}</p>
+      </div>
+    </div>
+
+    <!-- Navigation links at bottom -->
+    <div class="border-t p-4 space-y-2">
+      <a href="/chat"
+        class="flex items-center gap-2 px-4 py-3 rounded-lg bg-aqar-green text-white hover:bg-aqar-dark transition font-semibold">
+        <i class="fas fa-comment-dots"></i>
+        {{ 'دردشة جديدة' if lang == 'ar' else 'New Chat' }}
+      </a>
+      <a href="/profile"
+        class="flex items-center gap-2 px-4 py-3 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition font-semibold">
+        <i class="fas fa-user-circle"></i>
+        {{ 'ملفي الشخصي' if lang == 'ar' else 'My Profile' }}
+      </a>
+    </div>
+  </div>
+
+  <!-- Chat History Display -->
+  <div class="flex-1 flex flex-col bg-white">
+    <div id="historyPlaceholder" class="flex-1 flex flex-col items-center justify-center text-gray-400 p-12 text-center">
+      <i class="fas fa-comment-medical text-6xl mb-6 opacity-20"></i>
+      <h3 class="text-2xl font-semibold mb-2">{{ 'اختر محادثة لعرضها' if lang == 'ar' else 'Select a chat to view' }}</h3>
+      <p>{{ 'ستظهر تفاصيل المحادثة المختارة هنا' if lang == 'ar' else 'Details of your selected conversation will appear here' }}</p>
+    </div>
+
+    <div id="historyInterface" class="hidden flex flex-col h-full overflow-hidden">
+      <!-- History Header -->
+      <div class="p-4 border-b bg-white flex justify-between items-center">
+        <div>
+          <h3 id="historyTitle" class="font-bold text-lg text-aqar-dark"></h3>
+          <p id="historyDate" class="text-sm text-gray-500"></p>
+        </div>
+      </div>
+
+      <!-- Messages Area -->
+      <div id="historyMessages" class="flex-1 overflow-y-auto px-6 py-8 space-y-4 bg-aqar-bg">
+        <!-- Messages here -->
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/history.js') }}"></script>
+{% endblock %}

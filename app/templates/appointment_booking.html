@@ -1,0 +1,384 @@
+{% extends "base.html" %}
+
+{% set lang = request.cookies.get('lang', 'ar') %}
+
+{% block title %}Book Appointment - AqarBot{% endblock %}
+
+{% block content %}
+
+<div class="min-h-screen bg-gray-50 py-8 px-4">
+    <div class="max-w-4xl mx-auto">
+        
+        <!-- Header -->
+        <div class="mb-8">
+            <a href="/property?id={{ request.args.get('id') }}" class="text-aqar-green hover:text-aqar-dark inline-flex items-center gap-2">
+                <i class="fas fa-arrow-{% if lang == 'ar' %}right{% else %}left{% endif %}"></i>
+                {{ 'العودة للعقار' if lang == 'ar' else 'Back to Property' }}
+            </a>
+            <h1 class="text-3xl font-bold mt-4">
+                {{ 'احجز موعداً' if lang == 'ar' else 'Book an Appointment' }}
+            </h1>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            
+            <!-- Left: Property Info -->
+            <div class="md:col-span-1 bg-white rounded-lg shadow p-6">
+                <h2 class="text-lg font-bold mb-4">{{ 'معلومات العقار' if lang == 'ar' else 'Property Info' }}</h2>
+                
+                <div id="propertyInfo">
+                    <div class="animate-pulse">
+                        <div class="h-40 bg-gray-200 rounded mb-4"></div>
+                        <div class="h-4 bg-gray-200 rounded mb-2"></div>
+                        <div class="h-4 bg-gray-200 rounded mb-2"></div>
+                        <div class="h-4 bg-gray-200 rounded"></div>
+                    </div>
+                </div>
+
+                <div class="mt-6 border-t pt-6">
+                    <h3 class="font-bold mb-3">{{ 'معلومات الوكيل' if lang == 'ar' else 'Agent Info' }}</h3>
+                    <div id="agentInfo">
+                        <div class="animate-pulse">
+                            <div class="h-4 bg-gray-200 rounded mb-2"></div>
+                            <div class="h-4 bg-gray-200 rounded mb-2"></div>
+                            <div class="h-4 bg-gray-200 rounded"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Time Slot Selection -->
+            <div class="md:col-span-2">
+                
+                <!-- Date Selection -->
+                <div class="bg-white rounded-lg shadow p-6 mb-6">
+                    <h2 class="text-lg font-bold mb-4">{{ 'اختر التاريخ' if lang == 'ar' else 'Select Date' }}</h2>
+                    
+                    <div id="dateSelector" class="space-y-3">
+                        <!-- Dates will be populated by JavaScript -->
+                        <div class="animate-pulse">
+                            <div class="h-10 bg-gray-200 rounded mb-2"></div>
+                            <div class="h-10 bg-gray-200 rounded mb-2"></div>
+                            <div class="h-10 bg-gray-200 rounded"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Time Slots -->
+                <div class="bg-white rounded-lg shadow p-6 mb-6">
+                    <h2 class="text-lg font-bold mb-4">{{ 'اختر الوقت' if lang == 'ar' else 'Select Time' }}</h2>
+                    <p id="selectedDateLabel" class="text-sm text-gray-500 mb-4">
+                        {{ 'الرجاء اختيار تاريخ أولاً' if lang == 'ar' else 'Please select a date first' }}
+                    </p>
+
+                    <div id="timeSlotsContainer" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                        <p class="text-gray-500 col-span-full">
+                            {{ 'جاري التحميل...' if lang == 'ar' else 'Loading...' }}
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Notes -->
+                <div class="bg-white rounded-lg shadow p-6 mb-6">
+                    <h2 class="text-lg font-bold mb-4">{{ 'ملاحظات (اختيارية)' if lang == 'ar' else 'Notes (Optional)' }}</h2>
+                    <textarea id="appointmentNotes" 
+                              placeholder="{{ 'أضف ملاحظات عن موعدك' if lang == 'ar' else 'Add notes about your appointment' }}"
+                              class="w-full border border-gray-300 rounded-lg p-3 h-24"
+                              dir="{{ 'rtl' if lang == 'ar' else 'ltr' }}"></textarea>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="flex gap-3">
+                    <a href="/property?id={{ request.args.get('id') }}" 
+                       class="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold py-3 rounded-lg text-center transition">
+                        {{ 'إلغاء' if lang == 'ar' else 'Cancel' }}
+                    </a>
+                    <button id="confirmBookingBtn" 
+                            onclick="confirmBooking()"
+                            disabled
+                            class="flex-1 bg-aqar-green hover:bg-aqar-dark disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-lg transition">
+                        {{ 'تأكيد الحجز' if lang == 'ar' else 'Confirm Booking' }}
+                    </button>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+</div>
+
+<script>
+    const lang = '{{ lang }}';
+    const propertyId = new URLSearchParams(window.location.search).get('id');
+    const agentId = new URLSearchParams(window.location.search).get('agent_id');
+    
+    let selectedDate = null;
+    let selectedTime = null;
+    let availableSlots = {};
+
+    console.log('Booking page loaded with propertyId:', propertyId, 'agentId:', agentId);
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => {
+        loadPropertyInfo();
+        loadAvailableDates();
+    });
+
+    async function loadPropertyInfo() {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            window.location.href = '/login';
+            return;
+        }
+
+        // ✅ NEW: Try to get property data from localStorage first
+        const storedProperty = localStorage.getItem('currentProperty');
+        
+        if (storedProperty) {
+            try {
+                const propertyData = JSON.parse(storedProperty);
+                console.log('Loading property from localStorage:', propertyData);
+                
+                // Display property info from localStorage
+                document.getElementById('propertyInfo').innerHTML = `
+                    <p class="text-gray-600 mb-2">{{ 'تحميل من الذاكرة المحلية...' if lang == 'ar' else '(From local storage)' }}</p>
+                    <h3 class="font-bold text-lg mb-2">${propertyData.propertyTitle}</h3>
+                    <p class="text-sm text-gray-600">👤 ${propertyData.agentName}</p>
+                `;
+                
+                // Display agent info from localStorage
+                document.getElementById('agentInfo').innerHTML = `
+                    <p class="text-sm text-gray-600">{{ 'تم تحميل معلومات الوكيل من السابق' if lang == 'ar' else 'Agent info loaded' }}</p>
+                    <p class="text-xs text-gray-500 mt-2">ID: ${propertyData.agentId}</p>
+                `;
+                
+                return;
+            } catch (err) {
+                console.error('Error parsing stored property:', err);
+                // Fall through to API call if localStorage parsing fails
+            }
+        }
+
+        // ✅ FALLBACK: If localStorage data doesn't exist, fetch from API
+        console.log('No stored property data, fetching from API...');
+        
+        try {
+            const res = await fetch(`/api/property/${propertyId}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            const data = await res.json();
+            if (!data.success) {
+                console.error('Property load failed:', data);
+                document.getElementById('propertyInfo').innerHTML = `
+                    <div class="text-red-500 p-4 bg-red-50 rounded">
+                        {{ 'فشل تحميل معلومات العقار' if lang == 'ar' else 'Failed to load property info' }}
+                    </div>
+                `;
+                return;
+            }
+
+            const property = data.property;
+            const agent = data.agent;
+
+            // Display property info
+            document.getElementById('propertyInfo').innerHTML = `
+                <img src="${property.image_url}" alt="${property.title}" class="w-full h-40 object-cover rounded-lg mb-4">
+                <h3 class="font-bold text-lg">${property.title}</h3>
+                <p class="text-aqar-green font-semibold">ر.س ${property.price?.toLocaleString()}</p>
+                <p class="text-sm text-gray-600">📍 ${property.location}</p>
+                <p class="text-sm text-gray-600">🏠 ${property.property_type}</p>
+            `;
+
+            // Display agent info
+            if (agent) {
+                document.getElementById('agentInfo').innerHTML = `
+                    <p class="font-bold">${agent.name}</p>
+                    <p class="text-sm text-gray-600">${agent.agency_name}</p>
+                    <p class="text-sm text-gray-600">⭐ ${agent.rating}/5</p>
+                    <p class="text-sm text-aqar-green mt-2">📞 <a href="tel:${agent.phone_number}">${agent.phone_number}</a></p>
+                    <p class="text-sm text-aqar-green">✉️ <a href="mailto:${agent.email}">${agent.email}</a></p>
+                `;
+            }
+        } catch (err) {
+            console.error('Error loading property:', err);
+            document.getElementById('propertyInfo').innerHTML = `
+                <div class="text-red-500 p-4 bg-red-50 rounded">
+                    {{ 'خطأ في الاتصال بالخادم' if lang == 'ar' else 'Server connection error' }}
+                </div>
+            `;
+        }
+    }
+
+    async function loadAvailableDates() {
+        const token = localStorage.getItem('token');
+
+        try {
+            console.log('Fetching available slots for property:', propertyId);
+            
+            const res = await fetch(`/api/appointments/available-slots/${propertyId}?days_ahead=7`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            console.log('Slots API response status:', res.status);
+
+            const data = await res.json();
+            console.log('Slots API response:', data);
+
+            if (!data.success) {
+                console.error('Failed to load slots:', data.message);
+                document.getElementById('dateSelector').innerHTML = `
+                    <div class="text-red-500 p-4 bg-red-50 rounded">
+                        ${lang === 'ar' ? 'خطأ في تحميل المواعيد المتاحة' : 'Error loading available slots'}
+                    </div>
+                `;
+                return;
+            }
+
+            // Group slots by date
+            availableSlots = {};
+            data.available_slots.forEach(slot => {
+                const date = slot.split(' ')[0];
+                if (!availableSlots[date]) {
+                    availableSlots[date] = [];
+                }
+                availableSlots[date].push(slot);
+            });
+
+            console.log('Available slots grouped:', availableSlots);
+
+            // Display dates
+            const dateSelector = document.getElementById('dateSelector');
+            dateSelector.innerHTML = '';
+            
+            Object.keys(availableSlots).forEach(date => {
+                const dateObj = new Date(date);
+                const dayName = dateObj.toLocaleDateString(lang === 'ar' ? 'ar-SA' : 'en-US', { weekday: 'short' });
+                const dateStr = dateObj.toLocaleDateString(lang === 'ar' ? 'ar-SA' : 'en-US', { month: 'short', day: 'numeric' });
+                
+                const dateBtn = document.createElement('button');
+                dateBtn.className = 'w-full p-3 border-2 border-gray-300 rounded-lg hover:border-aqar-green hover:bg-aqar-green/10 transition text-left';
+                dateBtn.innerHTML = `<strong>${dayName}</strong><br><small>${dateStr}</small>`;
+                dateBtn.onclick = () => selectDate(date, dateBtn);
+                
+                dateSelector.appendChild(dateBtn);
+            });
+        } catch (err) {
+            console.error('Error loading dates:', err);
+            document.getElementById('dateSelector').innerHTML = `
+                <div class="text-red-500 p-4 bg-red-50 rounded">
+                    ${lang === 'ar' ? 'خطأ في الاتصال بالخادم' : 'Server connection error'}
+                </div>
+            `;
+        }
+    }
+
+    function selectDate(date, element) {
+        selectedDate = date;
+        selectedTime = null;
+        
+        document.querySelectorAll('#dateSelector button').forEach(btn => {
+            btn.classList.remove('border-aqar-green', 'bg-aqar-green/10');
+            btn.classList.add('border-gray-300');
+        });
+        element.classList.add('border-aqar-green', 'bg-aqar-green/10');
+
+        const dateObj = new Date(date);
+        const dateStr = dateObj.toLocaleDateString(lang === 'ar' ? 'ar-SA' : 'en-US', { 
+            weekday: 'long', 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+        });
+        document.getElementById('selectedDateLabel').textContent = `${lang === 'ar' ? 'الأوقات المتاحة ل' : 'Available times for'} ${dateStr}`;
+
+        displayTimeSlots(availableSlots[date]);
+        
+        updateConfirmButton();
+    }
+
+    function displayTimeSlots(slots) {
+        const container = document.getElementById('timeSlotsContainer');
+        container.innerHTML = '';
+
+        slots.forEach(slot => {
+            const time = slot.split(' ')[1];
+            const btn = document.createElement('button');
+            btn.className = 'p-3 border-2 border-aqar-green rounded-lg bg-aqar-green text-white font-semibold hover:bg-aqar-dark transition';
+            btn.textContent = time;
+            btn.onclick = () => selectTime(slot, btn);
+            container.appendChild(btn);
+        });
+    }
+
+    function selectTime(slot, element) {
+        selectedTime = slot;
+
+        document.querySelectorAll('#timeSlotsContainer button').forEach(btn => {
+            btn.classList.remove('bg-aqar-dark', 'border-aqar-dark');
+            btn.classList.add('bg-aqar-green', 'border-aqar-green');
+        });
+        element.classList.add('bg-aqar-dark', 'border-aqar-dark');
+
+        updateConfirmButton();
+    }
+
+    function updateConfirmButton() {
+        const btn = document.getElementById('confirmBookingBtn');
+        btn.disabled = !selectedDate || !selectedTime;
+    }
+
+    async function confirmBooking() {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            window.location.href = '/login';
+            return;
+        }
+
+        if (!selectedDate || !selectedTime || !propertyId || !agentId) {
+            alert(lang === 'ar' ? 'الرجاء اختيار موعد صحيح' : 'Please select a valid appointment');
+            return;
+        }
+
+        const btn = document.getElementById('confirmBookingBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + (lang === 'ar' ? 'جاري الحجز...' : 'Booking...');
+
+        try {
+            const res = await fetch(`/api/appointments/book`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    property_id: parseInt(propertyId),
+                    agent_id: parseInt(agentId),
+                    appointment_time: selectedTime,
+                    notes: document.getElementById('appointmentNotes').value
+                })
+            });
+
+            const data = await res.json();
+
+            if (data.success) {
+                // ✅ Clear localStorage after successful booking
+                localStorage.removeItem('currentProperty');
+                
+                alert(lang === 'ar' ? 'تم حجز الموعد بنجاح!' : 'Appointment booked successfully!');
+                window.location.href = '/appointments';
+            } else {
+                alert(data.message || (lang === 'ar' ? 'فشل الحجز' : 'Booking failed'));
+                btn.disabled = false;
+                btn.innerHTML = lang === 'ar' ? 'تأكيد الحجز' : 'Confirm Booking';
+            }
+        } catch (err) {
+            console.error('Error booking:', err);
+            alert(lang === 'ar' ? 'حدث خطأ' : 'An error occurred');
+            btn.disabled = false;
+            btn.innerHTML = lang === 'ar' ? 'تأكيد الحجز' : 'Confirm Booking';
+        }
+    }
+</script>
+
+{% endblock %}

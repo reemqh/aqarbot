@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+
+{% set lang = request.cookies.get('lang', 'ar') %}
+
+{% block title %}
+    AqarBot - Property Details
+{% endblock %}
+
+{% block content %}
+
+<div class="min-h-screen bg-aqar-bg py-8 px-4 sm:px-6 lg:px-8">
+  <div class="max-w-6xl mx-auto">
+    <!-- Back button -->
+    <a href="/chat" class="inline-flex items-center text-aqar-green hover:text-aqar-dark mb-6">
+      <i class="fas fa-arrow-{% if lang == 'ar' %}right{% else %}left{% endif %} mr-2"></i>
+      {{ 'العودة إلى الدردشة' if lang == 'ar' else 'Back to Chat' }}
+    </a>
+
+    <div class="bg-white rounded-2xl shadow-lg overflow-hidden">
+      <!-- Main image -->
+      <div id="propertyImage">
+        <div class="w-full max-h-64 bg-gray-100 flex items-center justify-center overflow-hidden rounded-t-2xl">
+          <div class="text-center">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-aqar-green mx-auto mb-4"></div>
+            <p>{{ 'جاري التحميل...' if lang == 'ar' else 'Loading...' }}</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Content -->
+      <div class="p-8">
+        <!-- Title & Price -->
+        <div class="flex {% if lang == 'ar' %}flex-row-reverse{% endif %} justify-between items-start mb-6">
+          <h1 id="propertyTitle" class="text-3xl font-bold text-aqar-dark">-</h1>
+          <div id="propertyPrice" class="text-3xl font-bold text-aqar-green">-</div>
+        </div>
+
+        <!-- Quick info -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8 text-sm text-gray-600">
+          <div>
+            <i class="fas fa-map-marker-alt mr-2 text-aqar-green"></i>
+            <span id="propertyLocation">-</span>
+          </div>
+          <div>
+            <i class="fas fa-home mr-2 text-aqar-green"></i>
+            <span id="propertyType">-</span>
+          </div>
+          <div>
+            <i class="fas fa-bed mr-2 text-aqar-green"></i>
+            <span id="propertyBeds">-</span> {{ 'غرف' if lang == 'ar' else 'rooms' }}
+          </div>
+          <div>
+            <i class="fas fa-ruler-combined mr-2 text-aqar-green"></i>
+            <span id="propertyArea">-</span> sqft
+          </div>
+        </div>
+
+        <!-- Description -->
+        <div class="mb-8">
+          <h2 class="text-xl font-semibold mb-3">
+            {{ 'الوصف' if lang == 'ar' else 'Description' }}
+          </h2>
+          <p id="propertyDescription" class="text-gray-700 leading-relaxed">-</p>
+        </div>
+
+        <!-- Amenities -->
+        <div class="mb-8">
+          <h2 class="text-xl font-semibold mb-3">
+            {{ 'المرافق' if lang == 'ar' else 'Amenities' }}
+          </h2>
+          <div id="propertyAmenities" class="flex flex-wrap gap-2">
+            <span class="text-gray-500">-</span>
+          </div>
+        </div>
+
+        <!-- Agent Info -->
+        <div id="agentSection" class="border-t pt-8 mt-8">
+          <h2 class="text-xl font-semibold mb-4">
+            {{ 'معلومات الوكيل' if lang == 'ar' else 'Agent Information' }}
+          </h2>
+          <div class="bg-gray-50 p-6 rounded-xl">
+            <div class="flex {% if lang == 'ar' %}flex-row-reverse{% endif %} justify-between items-start">
+              <div>
+                <h3 id="agentName" class="font-bold text-lg">-</h3>
+                <p id="agencyName" class="text-gray-600">-</p>
+                <p id="agentSpec" class="text-sm text-gray-500 mt-1">
+                  {{ 'التخصصات' if lang == 'ar' else 'Specializations' }}: <span>-</span>
+                </p>
+                <p id="agentRating" class="text-sm text-gray-500">
+                  {{ 'التقييم' if lang == 'ar' else 'Rating' }}: <span>-</span> ★
+                </p>
+              </div>
+              <div class="{% if lang == 'ar' %}text-left{% else %}text-right{% endif %}">
+                <!-- ✅ UPDATED: Changed onclick to call bookAppointment() without parameters -->
+                <!-- Function will get propertyId and agentId from window.currentPropertyData -->
+                <button onclick="bookAppointment()" class="inline-block bg-aqar-green text-white px-6 py-3 rounded-lg hover:bg-aqar-dark transition mb-3 font-semibold">
+                  <i class="fas fa-calendar-check mr-2"></i>
+                  {{ 'احجز موعد' if lang == 'ar' else 'Book Appointment' }}
+                </button>
+                <p class="text-sm text-gray-600">
+                  <span id="agentPhoneDisplay">-</span><br>
+                  <a id="agentEmail" href="mailto:#" class="text-aqar-green hover:underline">-</a>
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Additional Info -->
+        <div class="mt-8 p-6 bg-blue-50 rounded-lg border border-blue-200">
+          <p class="text-sm text-gray-600">
+            <i class="fas fa-info-circle text-blue-500 mr-2"></i>
+            {{ 'للمزيد من المعلومات أو حجز موعد، يرجى التواصل مع الوكيل' if lang == 'ar' else 'For more information or to book an appointment, please contact the agent' }}
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ✅ FIX: Only declare lang, API_BASE is already in base.html -->
+<script>
+  const lang = '{{ lang }}';
+  // API_BASE is already declared in base.html, so don't redeclare it
+</script>
+<script src="/static/js/property.js"></script>
+
+{% endblock %}

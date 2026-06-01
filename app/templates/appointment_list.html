@@ -1,0 +1,249 @@
+{% extends "base.html" %}
+
+{% set lang = request.cookies.get('lang', 'ar') %}
+
+{% block title %}My Appointments - AqarBot{% endblock %}
+
+{% block content %}
+
+<div class="min-h-screen bg-gray-50 py-8 px-4">
+    <div class="max-w-5xl mx-auto">
+        
+        <!-- Header -->
+        <div class="mb-8 flex justify-between items-center">
+            <div>
+                <a href="/chat" class="text-aqar-green hover:text-aqar-dark inline-flex items-center gap-2 mb-4">
+                    <i class="fas fa-arrow-{% if lang == 'ar' %}right{% else %}left{% endif %}"></i>
+                    {{ 'العودة' if lang == 'ar' else 'Back' }}
+                </a>
+                <h1 class="text-3xl font-bold">{{ 'مواعيدي' if lang == 'ar' else 'My Appointments' }}</h1>
+            </div>
+            <a href="/chat" class="bg-aqar-green hover:bg-aqar-dark text-white px-6 py-3 rounded-lg font-semibold">
+                {{ 'بحث عن عقار' if lang == 'ar' else 'Find Property' }}
+            </a>
+        </div>
+
+        <!-- Filter Tabs -->
+        <div class="flex gap-2 mb-8 border-b overflow-x-auto">
+            <button onclick="filterAppointments('pending')" 
+                    class="filterTab active px-6 py-3 font-semibold border-b-2 border-aqar-green text-aqar-green whitespace-nowrap">
+                {{ 'قادمة' if lang == 'ar' else 'Upcoming' }}
+                <span class="text-xs ml-1">(<span id="pendingCount">0</span>)</span>
+            </button>
+            <button onclick="filterAppointments('completed')" 
+                    class="filterTab px-6 py-3 font-semibold border-b-2 border-transparent text-gray-600 hover:text-gray-800 whitespace-nowrap">
+                {{ 'مكتملة' if lang == 'ar' else 'Completed' }}
+                <span class="text-xs ml-1">(<span id="completedCount">0</span>)</span>
+            </button>
+            <button onclick="filterAppointments('cancelled')" 
+                    class="filterTab px-6 py-3 font-semibold border-b-2 border-transparent text-gray-600 hover:text-gray-800 whitespace-nowrap">
+                {{ 'ملغاة' if lang == 'ar' else 'Cancelled' }}
+                <span class="text-xs ml-1">(<span id="cancelledCount">0</span>)</span>
+            </button>
+        </div>
+
+        <!-- Appointments Grid -->
+        <div id="appointmentsContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <!-- Loading state -->
+            <div class="col-span-full text-center py-8">
+                <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-aqar-green mx-auto"></div>
+                <p class="text-gray-500 mt-4">{{ 'جاري التحميل...' if lang == 'ar' else 'Loading...' }}</p>
+            </div>
+        </div>
+
+        <!-- Empty state -->
+        <div id="emptyState" class="hidden col-span-full text-center py-12">
+            <i class="fas fa-calendar-check text-6xl text-gray-300 mb-4"></i>
+            <p class="text-gray-500 text-lg">{{ 'لا توجد مواعيد' if lang == 'ar' else 'No appointments' }}</p>
+            <a href="/chat" class="inline-block mt-4 bg-aqar-green hover:bg-aqar-dark text-white px-6 py-2 rounded-lg">
+                {{ 'ابحث عن عقار' if lang == 'ar' else 'Search Properties' }}
+            </a>
+        </div>
+
+    </div>
+</div>
+
+<!-- Confirmation Dialog -->
+<div id="confirmDialog" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg p-6 max-w-sm mx-4">
+        <h3 class="font-bold text-lg mb-4">{{ 'تأكيد الإلغاء' if lang == 'ar' else 'Confirm Cancellation' }}</h3>
+        <p class="text-gray-600 mb-6">{{ 'هل تريد فعلاً إلغاء هذا الموعد؟' if lang == 'ar' else 'Are you sure you want to cancel this appointment?' }}</p>
+        <div class="flex gap-3">
+            <button onclick="closeConfirmDialog()" class="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 py-2 rounded-lg font-semibold">
+                {{ 'لا' if lang == 'ar' else 'No' }}
+            </button>
+            <button onclick="confirmCancel()" class="flex-1 bg-red-500 hover:bg-red-600 text-white py-2 rounded-lg font-semibold">
+                {{ 'نعم، ألغِ' if lang == 'ar' else 'Yes, Cancel' }}
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const lang = '{{ lang }}';
+    let currentFilter = 'pending';
+    let allAppointments = [];
+    let appointmentToCancel = null;
+
+    document.addEventListener('DOMContentLoaded', () => {
+        loadAppointments();
+    });
+
+    async function loadAppointments() {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            window.location.href = '/login';
+            return;
+        }
+
+        try {
+            const res = await fetch(`/api/appointments/history`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            const data = await res.json();
+            if (!data.success) return;
+
+            allAppointments = data.appointments;
+            updateCounts();
+            filterAppointments('pending');
+        } catch (err) {
+            console.error('Error loading appointments:', err);
+        }
+    }
+
+    function updateCounts() {
+        document.getElementById('pendingCount').textContent = allAppointments.filter(a => a.status === 'pending').length;
+        document.getElementById('completedCount').textContent = allAppointments.filter(a => a.status === 'completed').length;
+        document.getElementById('cancelledCount').textContent = allAppointments.filter(a => a.status === 'cancelled').length;
+    }
+
+    function filterAppointments(status) {
+        currentFilter = status;
+
+        // ✅ FIX: Update tab UI without using event.target
+        document.querySelectorAll('.filterTab').forEach(tab => {
+            tab.classList.remove('border-aqar-green', 'text-aqar-green');
+            tab.classList.add('border-transparent', 'text-gray-600');
+        });
+        
+        // Find and highlight the button for the selected status
+        document.querySelectorAll('.filterTab').forEach(tab => {
+            const onclickAttr = tab.getAttribute('onclick');
+            if (onclickAttr && onclickAttr.includes(`'${status}'`)) {
+                tab.classList.add('border-aqar-green', 'text-aqar-green');
+                tab.classList.remove('border-transparent', 'text-gray-600');
+            }
+        });
+
+        // Filter appointments
+        const filtered = allAppointments.filter(a => a.status === status);
+
+        if (filtered.length === 0) {
+            document.getElementById('appointmentsContainer').innerHTML = '';
+            document.getElementById('emptyState').classList.remove('hidden');
+            return;
+        }
+
+        document.getElementById('emptyState').classList.add('hidden');
+        displayAppointments(filtered);
+    }
+
+    function displayAppointments(appointments) {
+        const container = document.getElementById('appointmentsContainer');
+        container.innerHTML = '';
+
+        appointments.forEach(appt => {
+            const dateObj = new Date(appt.appointment_time);
+            const dateStr = dateObj.toLocaleDateString(lang === 'ar' ? 'ar-SA' : 'en-US', {
+                weekday: 'short',
+                month: 'short',
+                day: 'numeric'
+            });
+            const timeStr = dateObj.toLocaleTimeString(lang === 'ar' ? 'ar-SA' : 'en-US', {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+
+            const statusColor = appt.status === 'pending' ? 'bg-blue-100 text-blue-800' :
+                               appt.status === 'completed' ? 'bg-green-100 text-green-800' :
+                               'bg-red-100 text-red-800';
+
+            const statusLabel = appt.status === 'pending' ? (lang === 'ar' ? 'قادم' : 'Pending') :
+                               appt.status === 'completed' ? (lang === 'ar' ? 'مكتمل' : 'Completed') :
+                               (lang === 'ar' ? 'ملغى' : 'Cancelled');
+
+            const card = document.createElement('div');
+            card.className = 'bg-white rounded-lg shadow hover:shadow-lg transition overflow-hidden';
+            card.innerHTML = `
+                <img src="${appt.property_image || 'https://via.placeholder.com/300x200'}" alt="${appt.property_title}" class="w-full h-40 object-cover">
+                
+                <div class="p-4">
+                    <div class="flex justify-between items-start mb-2">
+                        <h3 class="font-bold">${appt.property_title}</h3>
+                        <span class="px-2 py-1 rounded text-xs font-semibold ${statusColor}">${statusLabel}</span>
+                    </div>
+                    
+                    <p class="text-sm text-gray-600 mb-3">📍 ${appt.property_location}</p>
+                    
+                    <p class="text-sm font-semibold text-aqar-green mb-1">📅 ${dateStr} ${timeStr}</p>
+                    <p class="text-sm text-gray-600">👤 ${appt.agent_name}</p>
+                    
+                    <div class="flex gap-2 mt-4">
+                        <a href="/appointment/${appt.id}" class="flex-1 bg-aqar-green hover:bg-aqar-dark text-white text-center py-2 rounded text-sm font-semibold transition">
+                            {{ 'عرض' if lang == 'ar' else 'View' }}
+                        </a>
+                        ${appt.status === 'pending' ? `
+                            <button onclick="showCancelConfirm(${appt.id})" class="flex-1 bg-red-500 hover:bg-red-600 text-white py-2 rounded text-sm font-semibold transition">
+                                {{ 'ألغِ' if lang == 'ar' else 'Cancel' }}
+                            </button>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+            container.appendChild(card);
+        });
+    }
+
+    function showCancelConfirm(appointmentId) {
+        appointmentToCancel = appointmentId;
+        document.getElementById('confirmDialog').classList.remove('hidden');
+    }
+
+    function closeConfirmDialog() {
+        document.getElementById('confirmDialog').classList.add('hidden');
+        appointmentToCancel = null;
+    }
+
+    async function confirmCancel() {
+        if (!appointmentToCancel) return;
+
+        const token = localStorage.getItem('token');
+
+        try {
+            const res = await fetch(`/api/appointments/${appointmentToCancel}/cancel`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({})
+            });
+
+            const data = await res.json();
+
+            if (data.success) {
+                closeConfirmDialog();
+                loadAppointments(); // Reload
+                alert(lang === 'ar' ? 'تم إلغاء الموعد بنجاح' : 'Appointment cancelled successfully');
+            } else {
+                alert(data.message || (lang === 'ar' ? 'فشل الإلغاء' : 'Cancellation failed'));
+            }
+        } catch (err) {
+            console.error('Error cancelling:', err);
+            alert(lang === 'ar' ? 'حدث خطأ' : 'An error occurred');
+        }
+    }
+</script>
+
+{% endblock %}

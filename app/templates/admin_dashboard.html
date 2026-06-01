@@ -1,0 +1,390 @@
+{% extends "base.html" %}
+
+{% block title %}AqarBot - Admin Dashboard{% endblock %}
+
+{% block head_extra %}
+<style>
+    .user-row { cursor: pointer; transition: background 0.15s; }
+    .user-row:hover { background: #f0fdf4; }
+
+    /* Drawer */
+    #drawer { transition: transform 0.3s ease; }
+    #drawer.open { transform: translateX(0) !important; }
+
+    /* Badge */
+    .badge { display: inline-flex; align-items: center; padding: 2px 10px; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
+    .badge-green  { background: #d1fae5; color: #065f46; }
+    .badge-yellow { background: #fef9c3; color: #92400e; }
+    .badge-red    { background: #fee2e2; color: #991b1b; }
+    .badge-gray   { background: #f3f4f6; color: #374151; }
+
+    /* Spinner */
+    .spinner { border: 3px solid #e5e7eb; border-top-color: #2f6a4a; border-radius: 50%; width: 28px; height: 28px; animation: spin 0.7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Auth guard: redirect if not admin -->
+<div id="authGuard" class="hidden fixed inset-0 bg-aqar-bg flex items-center justify-center z-50">
+    <div class="text-center">
+        <div class="spinner mx-auto mb-4"></div>
+        <p class="text-gray-500 text-sm">Checking access...</p>
+    </div>
+</div>
+
+<div id="mainContent" class="hidden">
+
+    <!-- Header Bar -->
+    <div class="bg-aqar-dark text-white px-6 py-4 flex items-center justify-between shadow">
+        <div>
+            <h1 class="text-xl font-bold text-aqar-mint">Admin Dashboard</h1>
+            <p class="text-xs text-gray-400 mt-0.5">Read-only access · AqarBot</p>
+        </div>
+        <div class="flex items-center gap-3">
+            <span id="adminName" class="text-sm text-gray-300 hidden"><i class="fas fa-user-shield mr-1"></i><span></span></span>
+            <button onclick="logout()"
+                class="text-xs bg-red-700 hover:bg-red-800 text-white px-3 py-1.5 rounded-lg transition-colors">
+                <i class="fas fa-sign-out-alt mr-1"></i> Logout
+            </button>
+        </div>
+    </div>
+
+    <!-- Stats Bar -->
+    <div class="bg-white border-b border-gray-200 px-6 py-3 flex items-center gap-6 text-sm text-gray-600">
+        <span><i class="fas fa-users text-aqar-green mr-1"></i> Total Users: <strong id="totalCount">—</strong></span>
+        <span class="text-gray-300">|</span>
+        <span class="text-gray-400 text-xs">Click any row to view full details</span>
+    </div>
+
+    <!-- Table Area -->
+    <div class="max-w-7xl mx-auto px-6 py-6">
+
+        <!-- Search -->
+        <div class="mb-4 flex items-center gap-3">
+            <div class="relative flex-1 max-w-sm">
+                <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+                <input id="searchInput" type="text" placeholder="Search by name or email..."
+                    class="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-aqar-green focus:border-aqar-green outline-none"
+                    oninput="filterTable()">
+            </div>
+            <button onclick="loadUsers()"
+                class="text-sm bg-aqar-green hover:bg-aqar-dark text-white px-4 py-2 rounded-lg transition-colors">
+                <i class="fas fa-sync-alt mr-1"></i> Refresh
+            </button>
+        </div>
+
+        <!-- Table -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <table class="w-full text-sm text-left">
+                <thead class="bg-aqar-dark text-white text-xs uppercase tracking-wider">
+                    <tr>
+                        <th class="px-5 py-3">#</th>
+                        <th class="px-5 py-3">Name</th>
+                        <th class="px-5 py-3">Email</th>
+                        <th class="px-5 py-3">Phone</th>
+                        <th class="px-5 py-3">Joined</th>
+                        <th class="px-5 py-3 text-center">Details</th>
+                    </tr>
+                </thead>
+                <tbody id="userTableBody" class="divide-y divide-gray-100">
+                    <tr>
+                        <td colspan="6" class="px-5 py-10 text-center">
+                            <div class="spinner mx-auto"></div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- DRAWER: User Detail Panel                                    -->
+<!-- ============================================================ -->
+<div id="drawerOverlay" class="hidden fixed inset-0 bg-black bg-opacity-40 z-30" onclick="closeDrawer()"></div>
+
+<div id="drawer"
+    class="fixed top-0 right-0 h-full w-full max-w-lg bg-white shadow-2xl z-40 overflow-y-auto"
+    style="transform: translateX(100%);">
+
+    <!-- Drawer Header -->
+    <div class="bg-aqar-dark text-white px-6 py-4 flex items-center justify-between sticky top-0 z-10">
+        <h2 class="text-lg font-semibold text-aqar-mint">User Details</h2>
+        <button onclick="closeDrawer()" class="text-gray-400 hover:text-white transition-colors text-xl">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+
+    <!-- Drawer Content -->
+    <div id="drawerContent" class="p-6 space-y-6">
+        <div class="flex justify-center py-10">
+            <div class="spinner"></div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const TOKEN_KEY = 'token';
+
+    // ── Auth guard ──────────────────────────────────────────────
+    document.getElementById('authGuard').classList.remove('hidden');
+
+    async function checkAuth() {
+        const token = localStorage.getItem(TOKEN_KEY);
+        if (!token) return redirectToLogin();
+
+        try {
+            const res = await fetch('/api/auth/verify-token', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await res.json();
+            if (!data.success) return redirectToLogin();
+
+            // Check role via users endpoint — if 403, not admin
+            const adminCheck = await fetch('/api/admin/users', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (adminCheck.status === 403 || adminCheck.status === 401) {
+                return redirectToLogin('Access denied. Admin only.');
+            }
+
+            // Show main content
+            document.getElementById('authGuard').classList.add('hidden');
+            document.getElementById('mainContent').classList.remove('hidden');
+
+            const adminNameEl = document.getElementById('adminName');
+            adminNameEl.querySelector('span').textContent = data.user_name || 'Admin';
+            adminNameEl.classList.remove('hidden');
+
+            loadUsers();
+        } catch (e) {
+            redirectToLogin();
+        }
+    }
+
+    function redirectToLogin(msg) {
+        if (msg) alert(msg);
+        window.location.href = '/login';
+    }
+
+    function logout() {
+        localStorage.removeItem(TOKEN_KEY);
+        window.location.href = '/login';
+    }
+
+    // ── Load Users ──────────────────────────────────────────────
+    let allUsers = [];
+
+    async function loadUsers() {
+        const token = localStorage.getItem(TOKEN_KEY);
+        const tbody = document.getElementById('userTableBody');
+        tbody.innerHTML = `<tr><td colspan="6" class="px-5 py-10 text-center"><div class="spinner mx-auto"></div></td></tr>`;
+
+        try {
+            const res = await fetch('/api/admin/users', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await res.json();
+
+            if (!data.success) {
+                tbody.innerHTML = `<tr><td colspan="6" class="px-5 py-8 text-center text-red-500">${data.message}</td></tr>`;
+                return;
+            }
+
+            allUsers = data.data;
+            document.getElementById('totalCount').textContent = allUsers.length;
+            renderTable(allUsers);
+
+        } catch (e) {
+            tbody.innerHTML = `<tr><td colspan="6" class="px-5 py-8 text-center text-red-500">Failed to load users.</td></tr>`;
+        }
+    }
+
+    function renderTable(users) {
+        const tbody = document.getElementById('userTableBody');
+        if (users.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="6" class="px-5 py-10 text-center text-gray-400">No users found.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = users.map((u, i) => `
+            <tr class="user-row" onclick="openDrawer(${u.user_id})">
+                <td class="px-5 py-3 text-gray-400 font-mono">${i + 1}</td>
+                <td class="px-5 py-3 font-medium text-gray-800">
+                    <div class="flex items-center gap-2">
+                        <div class="w-8 h-8 rounded-full bg-aqar-green flex items-center justify-center text-white text-xs font-bold">
+                            ${u.name.charAt(0).toUpperCase()}
+                        </div>
+                        ${escapeHtml(u.name)}
+                    </div>
+                </td>
+                <td class="px-5 py-3 text-gray-600">${escapeHtml(u.email)}</td>
+                <td class="px-5 py-3 text-gray-600">${u.phone_number || '<span class="text-gray-300">—</span>'}</td>
+                <td class="px-5 py-3 text-gray-500 text-xs">${formatDate(u.joined_at)}</td>
+                <td class="px-5 py-3 text-center">
+                    <button class="text-aqar-green hover:text-aqar-dark transition-colors">
+                        <i class="fas fa-chevron-right"></i>
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    function filterTable() {
+        const q = document.getElementById('searchInput').value.toLowerCase();
+        const filtered = allUsers.filter(u =>
+            u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)
+        );
+        renderTable(filtered);
+    }
+
+    // ── Drawer ──────────────────────────────────────────────────
+    async function openDrawer(userId) {
+        document.getElementById('drawerOverlay').classList.remove('hidden');
+        const drawer = document.getElementById('drawer');
+        drawer.classList.add('open');
+
+        document.getElementById('drawerContent').innerHTML = `
+            <div class="flex justify-center py-10"><div class="spinner"></div></div>`;
+
+        const token = localStorage.getItem(TOKEN_KEY);
+        try {
+            const res = await fetch(`/api/admin/users/${userId}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.message);
+            renderDrawer(data.data);
+        } catch (e) {
+            document.getElementById('drawerContent').innerHTML =
+                `<p class="text-red-500 text-sm">${e.message}</p>`;
+        }
+    }
+
+    function closeDrawer() {
+        document.getElementById('drawer').classList.remove('open');
+        document.getElementById('drawerOverlay').classList.add('hidden');
+    }
+
+    function renderDrawer(u) {
+        const searches = u.property_searches || [];
+        const appointments = u.appointments || [];
+
+        const searchesHtml = searches.length === 0
+            ? `<p class="text-gray-400 text-sm">No property searches yet.</p>`
+            : searches.map(s => {
+                const prefs = typeof s.preferences === 'string'
+                    ? JSON.parse(s.preferences) : (s.preferences || {});
+                return `
+                <div class="border border-gray-100 rounded-lg p-3 bg-gray-50 text-xs space-y-1">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="font-medium text-gray-700">Session #${s.session_id}</span>
+                        ${statusBadge(s.status)}
+                    </div>
+                    ${prefRow('Type', prefs.property_type)}
+                    ${prefRow('Location', prefs.location)}
+                    ${prefRow('Bedrooms', prefs.num_bedrooms)}
+                    ${prefRow('Budget', prefs.budget_min && prefs.budget_max
+                        ? `SAR ${Number(prefs.budget_min).toLocaleString()} – ${Number(prefs.budget_max).toLocaleString()}`
+                        : null)}
+                    ${prefRow('Facilities', prefs.required_facilities)}
+                    <div class="text-gray-400 pt-1">${formatDate(s.created_at)}</div>
+                </div>`;
+            }).join('');
+
+        const appsHtml = appointments.length === 0
+            ? `<p class="text-gray-400 text-sm">No appointments.</p>`
+            : appointments.map(a => `
+                <div class="border border-gray-100 rounded-lg p-3 bg-gray-50 text-xs space-y-1">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="font-medium text-gray-700">${escapeHtml(a.property_title)}</span>
+                        ${statusBadge(a.status)}
+                    </div>
+                    ${prefRow('Location', a.property_location)}
+                    ${prefRow('Agent', a.agent_name)}
+                    ${prefRow('Time', formatDate(a.appointment_time))}
+                    ${a.notes ? prefRow('Notes', a.notes) : ''}
+                </div>`).join('');
+
+        document.getElementById('drawerContent').innerHTML = `
+            <!-- Profile Card -->
+            <div class="flex items-center gap-4 p-4 bg-aqar-dark rounded-xl text-white">
+                <div class="w-14 h-14 rounded-full bg-aqar-green flex items-center justify-center text-2xl font-bold text-white flex-shrink-0">
+                    ${u.name.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                    <p class="text-lg font-semibold text-aqar-mint">${escapeHtml(u.name)}</p>
+                    <p class="text-sm text-gray-300">${escapeHtml(u.email)}</p>
+                    <p class="text-xs text-gray-400 mt-0.5">${u.phone_number || 'No phone'} · Joined ${formatDate(u.joined_at)}</p>
+                </div>
+            </div>
+
+            ${u.bio ? `<div class="text-sm text-gray-600 border border-gray-200 rounded-lg px-4 py-3 bg-gray-50"><i class="fas fa-quote-left text-gray-300 mr-1"></i>${escapeHtml(u.bio)}</div>` : ''}
+
+            <!-- Property Searches -->
+            <div>
+                <h3 class="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                    <i class="fas fa-home text-aqar-green"></i>
+                    Property Searches
+                    <span class="ml-auto text-xs font-normal text-gray-400">${searches.length} session(s)</span>
+                </h3>
+                <div class="space-y-2">${searchesHtml}</div>
+            </div>
+
+            <!-- Appointments -->
+            <div>
+                <h3 class="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                    <i class="fas fa-calendar-check text-aqar-green"></i>
+                    Appointments
+                    <span class="ml-auto text-xs font-normal text-gray-400">${appointments.length} total</span>
+                </h3>
+                <div class="space-y-2">${appsHtml}</div>
+            </div>
+        `;
+    }
+
+    // ── Helpers ─────────────────────────────────────────────────
+    function prefRow(label, value) {
+        if (!value && value !== 0) return '';
+        return `<div class="flex gap-2"><span class="text-gray-400 w-20 flex-shrink-0">${label}:</span><span class="text-gray-700 font-medium">${escapeHtml(String(value))}</span></div>`;
+    }
+
+    function statusBadge(status) {
+        const map = {
+            completed: 'badge-green',
+            active:    'badge-yellow',
+            cancelled: 'badge-red',
+            pending:   'badge-yellow',
+        };
+        const cls = map[status] || 'badge-gray';
+        return `<span class="badge ${cls}">${status}</span>`;
+    }
+
+    function formatDate(dateStr) {
+        if (!dateStr) return '—';
+        try {
+            return new Date(dateStr).toLocaleDateString('en-GB', {
+                day: '2-digit', month: 'short', year: 'numeric'
+            });
+        } catch { return dateStr; }
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    // ── Boot ────────────────────────────────────────────────────
+    checkAuth();
+</script>
+{% endblock %}

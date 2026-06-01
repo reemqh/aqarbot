@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+
+{% block title %}
+    {{ 'AqarBot - Profile' if lang == 'en' else 'AqarBot - الملف الشخصي' }}
+{% endblock %}
+
+{% block content %}
+
+<div class="min-h-screen bg-aqar-bg py-12 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-3xl mx-auto">
+
+        <!-- Loading State -->
+        <div id="loadingState" class="text-center py-12">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-aqar-green mx-auto"></div>
+            <p class="text-gray-500 mt-4">{{ 'جاري التحميل...' if lang == 'ar' else 'Loading...' }}</p>
+        </div>
+
+        <!-- Error State -->
+        <div id="errorState" class="hidden mb-6 p-4 rounded-lg text-center text-sm font-medium bg-red-100 text-red-800 border border-red-200">
+            {{ 'حدث خطأ في تحميل الملف الشخصي' if lang == 'ar' else 'Error loading profile' }}
+        </div>
+
+        <!-- Profile Card -->
+        <div id="profileCard" class="hidden bg-white shadow-2xl rounded-2xl overflow-hidden border border-gray-100">
+            <!-- Header -->
+            <div class="px-8 py-8 bg-aqar-dark text-white text-center">
+                <div class="w-24 h-24 mx-auto bg-aqar-mint rounded-full flex items-center justify-center text-4xl font-bold text-aqar-dark mb-4">
+                    <span id="userInitial">?</span>
+                </div>
+                <h1 id="userName" class="text-3xl font-bold tracking-tight">
+                    -
+                </h1>
+                <p class="mt-2 text-aqar-mint text-lg">
+                    {{ 'Member since registration' if lang == 'en' else 'عضو منذ التسجيل' }}
+                </p>
+            </div>
+
+            <!-- Info Section -->
+            <div class="p-8 space-y-8">
+                <!-- Email -->
+                <div class="flex items-center justify-between border-b border-gray-200 pb-6">
+                    <div class="flex items-center space-x-4 rtl:space-x-reverse">
+                        <div class="w-12 h-12 bg-aqar-mint rounded-full flex items-center justify-center">
+                            <i class="fas fa-envelope text-aqar-dark text-xl"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-sm font-medium text-gray-500">
+                                {{ 'Email Address' if lang == 'en' else 'البريد الإلكتروني' }}
+                            </h3>
+                            <p id="userEmail" class="mt-1 text-lg font-medium text-gray-900">
+                                -
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Phone -->
+                <div class="flex items-center justify-between border-b border-gray-200 pb-6">
+                    <div class="flex items-center space-x-4 rtl:space-x-reverse">
+                        <div class="w-12 h-12 bg-aqar-mint rounded-full flex items-center justify-center">
+                            <i class="fas fa-phone text-aqar-dark text-xl"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-sm font-medium text-gray-500">
+                                {{ 'Phone Number' if lang == 'en' else 'رقم الجوال' }}
+                            </h3>
+                            <p id="userPhone" class="mt-1 text-lg font-medium text-gray-900">
+                                {{ 'Not added' if lang == 'en' else 'غير مضاف' }}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Links -->
+        <div class="mt-10 flex justify-center gap-6 flex-wrap text-sm font-medium">
+            <a href="/chat" class="text-aqar-green hover:text-aqar-dark transition">
+                <i class="fas fa-comments mr-2"></i>
+                {{ 'Go to Chat' if lang == 'en' else 'الذهاب إلى الدردشة' }}
+            </a>
+            <a href="/appointments" class="text-blue-600 hover:text-blue-800 transition">
+                <i class="fas fa-calendar-check mr-2"></i>
+                {{ 'My Appointments' if lang == 'en' else 'مواعيدي' }}
+            </a>
+            <a href="/logout" class="text-red-600 hover:text-red-800 transition">
+                <i class="fas fa-sign-out-alt mr-2"></i>
+                {{ 'Log Out' if lang == 'en' else 'تسجيل الخروج' }}
+            </a>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    const lang = '{{ lang }}';
+
+    // Load profile when page loads
+    document.addEventListener('DOMContentLoaded', () => {
+        loadProfile();
+    });
+
+    async function loadProfile() {
+        const token = localStorage.getItem('token');
+
+        // Check if token exists
+        if (!token) {
+            showError();
+            setTimeout(() => {
+                window.location.href = '/login';
+            }, 2000);
+            return;
+        }
+
+        try {
+            // Fetch user profile from API
+            const res = await fetch('/api/users/profile', {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            const data = await res.json();
+
+            if (!data.success) {
+                console.error('Profile load failed:', data.message);
+                showError();
+                return;
+            }
+
+            // Display profile
+            displayProfile(data.data);
+
+        } catch (err) {
+            console.error('Error loading profile:', err);
+            showError();
+        }
+    }
+
+    function displayProfile(userData) {
+        // Hide loading, show profile
+        document.getElementById('loadingState').classList.add('hidden');
+        document.getElementById('profileCard').classList.remove('hidden');
+
+        // Set user data
+        const userName = userData.name || '?';
+        document.getElementById('userInitial').textContent = userName[0].toUpperCase();
+        document.getElementById('userName').textContent = userName;
+        document.getElementById('userEmail').textContent = userData.email || '-';
+        
+        // Handle phone - check if profile exists and has phone_number
+        const phone = userData.profile?.phone_number ||
+                    userData.phone_number || 
+                     (lang === 'ar' ? 'غير مضاف' : 'Not added');
+        document.getElementById('userPhone').textContent = phone;
+    }
+
+    function showError() {
+        document.getElementById('loadingState').classList.add('hidden');
+        document.getElementById('errorState').classList.remove('hidden');
+    }
+</script>
+
+{% endblock %}

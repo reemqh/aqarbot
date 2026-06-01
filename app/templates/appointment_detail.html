@@ -1,0 +1,330 @@
+{% extends "base.html" %}
+
+{% set lang = request.cookies.get('lang', 'ar') %}
+
+{% block title %}Appointment Details - AqarBot{% endblock %}
+
+{% block content %}
+
+<div class="min-h-screen bg-gray-50 py-8 px-4">
+    <div class="max-w-4xl mx-auto">
+        
+        <!-- Header -->
+        <a href="/appointments" class="text-aqar-green hover:text-aqar-dark inline-flex items-center gap-2 mb-6">
+            <i class="fas fa-arrow-{% if lang == 'ar' %}right{% else %}left{% endif %}"></i>
+            {{ 'العودة' if lang == 'ar' else 'Back' }}
+        </a>
+
+        <!-- Loading State -->
+        <div id="loadingState" class="text-center py-12">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-aqar-green mx-auto"></div>
+            <p class="text-gray-500 mt-4">{{ 'جاري التحميل...' if lang == 'ar' else 'Loading...' }}</p>
+        </div>
+
+        <!-- Content (Hidden initially) -->
+        <div id="appointmentContent" class="hidden">
+            
+            <!-- Status Badge -->
+            <div id="statusBadge" class="mb-6"></div>
+
+            <!-- Property Section -->
+            <div class="bg-white rounded-lg shadow p-6 mb-6">
+                <h2 class="text-2xl font-bold mb-4">{{ 'معلومات العقار' if lang == 'ar' else 'Property Information' }}</h2>
+                
+                <div id="propertyImage" class="mb-4 rounded-lg overflow-hidden">
+                    <img src="" alt="" class="w-full h-96 object-cover">
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <p id="propertyTitle" class="text-2xl font-bold mb-2"></p>
+                        <p id="propertyPrice" class="text-aqar-green text-2xl font-semibold mb-4"></p>
+                        <p id="propertyLocation" class="text-gray-600 mb-2">📍 </p>
+                        <p id="propertyType" class="text-gray-600 mb-2">🏠 </p>
+                        <p id="propertyDetails" class="text-gray-600"></p>
+                    </div>
+                    <div>
+                        <h3 class="font-bold mb-3">{{ 'الوصف' if lang == 'ar' else 'Description' }}</h3>
+                        <p id="propertyDescription" class="text-gray-700 leading-relaxed"></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Appointment Details Section -->
+            <div class="bg-white rounded-lg shadow p-6 mb-6">
+                <h2 class="text-2xl font-bold mb-4">{{ 'تفاصيل الموعد' if lang == 'ar' else 'Appointment Details' }}</h2>
+                
+                <div class="space-y-4">
+                    <div class="border-b pb-4">
+                        <p class="text-gray-600">{{ 'التاريخ والوقت' if lang == 'ar' else 'Date & Time' }}</p>
+                        <p id="appointmentDateTime" class="text-xl font-bold text-aqar-green"></p>
+                    </div>
+                    
+                    <div class="border-b pb-4">
+                        <p class="text-gray-600">{{ 'رقم الموعد' if lang == 'ar' else 'Appointment ID' }}</p>
+                        <p id="appointmentId" class="text-lg font-semibold"></p>
+                    </div>
+                    
+                    <div class="border-b pb-4">
+                        <p class="text-gray-600">{{ 'تم الحجز في' if lang == 'ar' else 'Booked On' }}</p>
+                        <p id="bookedDate" class="text-lg"></p>
+                    </div>
+
+                    <div id="notesSection" class="hidden border-b pb-4">
+                        <p class="text-gray-600">{{ 'الملاحظات' if lang == 'ar' else 'Notes' }}</p>
+                        <p id="appointmentNotes" class="text-lg text-gray-700"></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Agent Section -->
+            <div class="bg-white rounded-lg shadow p-6 mb-6">
+                <h2 class="text-2xl font-bold mb-4">{{ 'معلومات الوكيل' if lang == 'ar' else 'Agent Information' }}</h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <p id="agentName" class="text-2xl font-bold mb-2"></p>
+                        <p id="agencyName" class="text-gray-600 mb-2"></p>
+                        <p id="agentRating" class="text-lg mb-4">
+                            <span class="text-yellow-400">⭐</span>
+                            <span id="ratingValue"></span>/5
+                        </p>
+                    </div>
+                    <div>
+                        <p class="text-gray-600 mb-2">{{ 'الهاتف' if lang == 'ar' else 'Phone' }}</p>
+                        <p id="agentPhone" class="text-lg font-semibold mb-4">
+                            <a id="agentPhoneLink" href="" class="text-aqar-green hover:text-aqar-dark"></a>
+                        </p>
+                        
+                        <p class="text-gray-600 mb-2">{{ 'البريد الإلكتروني' if lang == 'ar' else 'Email' }}</p>
+                        <p id="agentEmail" class="text-lg">
+                            <a id="agentEmailLink" href="" class="text-aqar-green hover:text-aqar-dark"></a>
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Amenities Section (if any) -->
+            <div id="amenitiesSection" class="hidden bg-white rounded-lg shadow p-6 mb-6">
+                <h2 class="text-2xl font-bold mb-4">{{ 'المرافق' if lang == 'ar' else 'Amenities' }}</h2>
+                <div id="amenitiesList" class="flex flex-wrap gap-2"></div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex gap-3">
+                <a href="/appointments" class="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold py-3 rounded-lg text-center transition">
+                    {{ 'العودة' if lang == 'ar' else 'Back' }}
+                </a>
+                <button id="cancelBtn" onclick="showCancelConfirm()" 
+                        class="flex-1 bg-red-500 hover:bg-red-600 text-white font-semibold py-3 rounded-lg transition">
+                    {{ 'ألغِ الموعد' if lang == 'ar' else 'Cancel Appointment' }}
+                </button>
+                <button id="completeBtn" onclick="markCompleted()" 
+                        class="hidden flex-1 bg-green-500 hover:bg-green-600 text-white font-semibold py-3 rounded-lg transition">
+                    {{ 'تم الاكتمال' if lang == 'ar' else 'Mark Completed' }}
+                </button>
+            </div>
+
+        </div>
+
+    </div>
+</div>
+
+<!-- Confirmation Dialog -->
+<div id="confirmDialog" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg p-6 max-w-sm mx-4">
+        <h3 class="font-bold text-lg mb-4">{{ 'تأكيد الإلغاء' if lang == 'ar' else 'Confirm Cancellation' }}</h3>
+        <p class="text-gray-600 mb-6">{{ 'هل تريد فعلاً إلغاء هذا الموعد؟' if lang == 'ar' else 'Are you sure you want to cancel this appointment?' }}</p>
+        <div class="flex gap-3">
+            <button onclick="closeConfirmDialog()" class="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 py-2 rounded-lg font-semibold">
+                {{ 'لا' if lang == 'ar' else 'No' }}
+            </button>
+            <button onclick="confirmCancel()" class="flex-1 bg-red-500 hover:bg-red-600 text-white py-2 rounded-lg font-semibold">
+                {{ 'نعم، ألغِ' if lang == 'ar' else 'Yes, Cancel' }}
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const lang = '{{ lang }}';
+    const appointmentId = window.location.pathname.split('/').pop();
+    let currentAppointment = null;
+
+    document.addEventListener('DOMContentLoaded', () => {
+        loadAppointmentDetails();
+    });
+
+    async function loadAppointmentDetails() {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            window.location.href = '/login';
+            return;
+        }
+
+        try {
+            const res = await fetch(`/api/appointments/${appointmentId}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            const data = await res.json();
+            if (!data.success) {
+                alert(lang === 'ar' ? 'الموعد غير موجود' : 'Appointment not found');
+                window.location.href = '/appointments';
+                return;
+            }
+
+            currentAppointment = data.appointment;
+            displayAppointmentDetails(currentAppointment);
+        } catch (err) {
+            console.error('Error loading appointment:', err);
+        }
+    }
+
+    function displayAppointmentDetails(appt) {
+        // Status badge
+        const statusColor = appt.status === 'pending' ? 'bg-blue-100 text-blue-800' :
+                           appt.status === 'completed' ? 'bg-green-100 text-green-800' :
+                           'bg-red-100 text-red-800';
+        const statusLabel = appt.status === 'pending' ? (lang === 'ar' ? 'قادم' : 'Pending') :
+                           appt.status === 'completed' ? (lang === 'ar' ? 'مكتمل' : 'Completed') :
+                           (lang === 'ar' ? 'ملغى' : 'Cancelled');
+
+        document.getElementById('statusBadge').innerHTML = `
+            <div class="inline-block px-4 py-2 rounded-lg font-semibold ${statusColor}">
+                ${statusLabel}
+            </div>
+        `;
+
+        // Property info
+        document.getElementById('propertyImage').innerHTML = `
+            <img src="${appt.property_image}" alt="${appt.property_title}" class="w-full h-96 object-cover">
+        `;
+        document.getElementById('propertyTitle').textContent = appt.property_title;
+        document.getElementById('propertyPrice').textContent = `ر.س ${appt.property_price?.toLocaleString()}`;
+        document.getElementById('propertyLocation').innerHTML = `📍 ${appt.property_location}`;
+        document.getElementById('propertyType').innerHTML = `🏠 ${appt.property_type || 'Property'}`;
+        document.getElementById('propertyDetails').innerHTML = `
+            🛏️ ${appt.num_bedrooms} {{ 'غرف نوم' if lang == 'ar' else 'Bedrooms' }} | 
+            🚿 ${appt.num_bathrooms} {{ 'حمامات' if lang == 'ar' else 'Bathrooms' }}
+        `;
+        document.getElementById('propertyDescription').textContent = 'Viewing scheduled for this property';
+
+        // Appointment details
+        const dateObj = new Date(appt.appointment_time);
+        const dateStr = dateObj.toLocaleDateString(lang === 'ar' ? 'ar-SA' : 'en-US', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+        const timeStr = dateObj.toLocaleTimeString(lang === 'ar' ? 'ar-SA' : 'en-US', {
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+
+        document.getElementById('appointmentDateTime').textContent = `${dateStr} ${timeStr}`;
+        document.getElementById('appointmentId').textContent = `#${appt.id}`;
+        
+        const bookedDate = new Date(appt.created_at);
+        document.getElementById('bookedDate').textContent = bookedDate.toLocaleDateString(
+            lang === 'ar' ? 'ar-SA' : 'en-US',
+            { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }
+        );
+
+        // Notes
+        if (appt.notes) {
+            document.getElementById('notesSection').classList.remove('hidden');
+            document.getElementById('appointmentNotes').textContent = appt.notes;
+        }
+
+        // Agent info
+        document.getElementById('agentName').textContent = appt.agent_name;
+        document.getElementById('agencyName').textContent = appt.agency_name || 'Agency';
+        document.getElementById('ratingValue').textContent = appt.rating || '5';
+        document.getElementById('agentPhoneLink').href = `tel:${appt.agent_phone}`;
+        document.getElementById('agentPhoneLink').textContent = appt.agent_phone;
+        document.getElementById('agentEmailLink').href = `mailto:${appt.agent_email}`;
+        document.getElementById('agentEmailLink').textContent = appt.agent_email;
+
+        // Show/hide buttons based on status
+        const cancelBtn = document.getElementById('cancelBtn');
+        const completeBtn = document.getElementById('completeBtn');
+        
+        if (appt.status === 'pending') {
+            cancelBtn.classList.remove('hidden');
+            completeBtn.classList.remove('hidden');
+        } else {
+            cancelBtn.classList.add('hidden');
+            completeBtn.classList.add('hidden');
+        }
+
+        // Hide loading, show content
+        document.getElementById('loadingState').classList.add('hidden');
+        document.getElementById('appointmentContent').classList.remove('hidden');
+    }
+
+    function showCancelConfirm() {
+        document.getElementById('confirmDialog').classList.remove('hidden');
+    }
+
+    function closeConfirmDialog() {
+        document.getElementById('confirmDialog').classList.add('hidden');
+    }
+
+    async function confirmCancel() {
+        const token = localStorage.getItem('token');
+
+        try {
+            const res = await fetch(`/api/appointments/${appointmentId}/cancel`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({})
+            });
+
+            const data = await res.json();
+
+            if (data.success) {
+                alert(lang === 'ar' ? 'تم إلغاء الموعد بنجاح' : 'Appointment cancelled successfully');
+                window.location.href = '/appointments';
+            } else {
+                alert(data.message || (lang === 'ar' ? 'فشل الإلغاء' : 'Cancellation failed'));
+            }
+        } catch (err) {
+            console.error('Error cancelling:', err);
+            alert(lang === 'ar' ? 'حدث خطأ' : 'An error occurred');
+        }
+    }
+
+    async function markCompleted() {
+        const token = localStorage.getItem('token');
+
+        try {
+            const res = await fetch(`/api/appointments/${appointmentId}/complete`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({})
+            });
+
+            const data = await res.json();
+
+            if (data.success) {
+                alert(lang === 'ar' ? 'تم تحديث الموعد بنجاح' : 'Appointment updated successfully');
+                window.location.href = '/appointments';
+            } else {
+                alert(data.message || (lang === 'ar' ? 'فشل التحديث' : 'Update failed'));
+            }
+        } catch (err) {
+            console.error('Error marking completed:', err);
+            alert(lang === 'ar' ? 'حدث خطأ' : 'An error occurred');
+        }
+    }
+</script>
+
+{% endblock %}
